@@ -20,7 +20,7 @@ def parse_args():
         help='File to write the output to.',
     )
 
-    return parser.parse_args(args)
+    return parser.parse_args()
 
 def main():
     options = parse_args()
