@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os
+import fitparse, os
 
 def dump_date(date):
     return date.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
@@ -88,7 +88,6 @@ class GPXDumper:
         buffer.append(3*self.TAB + '</trkpt>\n')
 
         return ''.join(buffer)
-
 
 class TCXDumper:
     TAB = '  '
@@ -191,6 +190,54 @@ class TCXDumper:
         buffer.append(6*self.TAB + '</Position>\n')
 
         return ''.join(buffer)
+
+class FITDumper:
+    def dump(self, fit_file):
+        fitfile = fitparse.FitFile(
+            fit_file,
+            data_processor=fitparse.StandardUnitsDataProcessor(),
+        )
+        activity = model.Activity()
+        data = {}
+
+        for message in fitfile.get_messages():
+            self._handle_message(message, activity, data)
+
+        return activity
+
+    def _handle_message(self, message, activity, data):
+        if message.name == 'activity':
+            data['trigger_method'] = message.get('type').value
+        elif message.name == 'lap':
+            self._handle_lap(message, activity, data)
+        elif message.name == 'record':
+            self._handle_record(message, activity, data)
+
+    def _handle_lap(self, message, activity, data):
+        lap = model.Lap(message.get('start_time').value)
+
+        lap.trigger_method = data['trigger_method']
+        lap.duration = int(self._get_or_else(message, 'total_elapsed_time', 0))
+        lap.distance = int(self._get_or_else(message, 'total_distance', 0))
+        lap.calories = int(self._get_or_else(message, 'total_calories', 0))
+        lap.max_speed = float(self._get_or_else(message, 'max_speed', 0))
+        lap.avg_heart_rate = int(self._get_or_else(message, 'avg_heart_rate', 0))
+        lap.max_heart_rate = int(self._get_or_else(message, 'max_heart_rate', 0))
+
+        activity.type = message.get('sport').value
+        activity.laps.append(lap)
+
+    def _handle_record(self, message, activity, data):
+        trackpoint = model.Trackpoint(message.get('timestamp').value)
+
+        trackpoint.heart_rate = int(self._get_or_else(message, 'heart_rate', 0))
+
+        activity.laps[-1].trackpoints.append(trackpoint)
+
+    def _get_or_else(self, message, key, default=None):
+        value = message.get(key)
+
+        return value.value if value is not None and value.value is not None else default
 
 def dumper_for_file(filename):
     parsers_map = {
