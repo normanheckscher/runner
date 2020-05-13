@@ -194,6 +194,7 @@ class TCXDumper:
 
 def dumper_for_file(filename):
     parsers_map = {
+        'fit': FITParser, # may crash as not implemented yet
         'tcx': TCXDumper,
         'gpx': GPXDumper
     }
